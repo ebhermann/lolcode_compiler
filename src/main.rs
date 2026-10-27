@@ -53,6 +53,7 @@ pub struct LolLexicalAnalyzer {
     position: usize,
     current_build: String,
     pub tokens: Vec<String>,
+    pub previous_token: String,
     pub articles: Vec<String>,
     pub verbs: Vec<String>,
     pub nouns: Vec<String>,
@@ -93,6 +94,7 @@ impl LolLexicalAnalyzer {
             position: 0,
             current_build: String::new(),
             tokens: Vec::new(),
+            previous_token: String::new(),
             articles: vec!["a".into(), "teh".into()],
             verbs: vec!["lovez".into(), "hatez".into(), "ates".into()],
             nouns: vec!["dawg".into(), "kat".into(), "rat".into()],
@@ -123,10 +125,21 @@ impl LolLexicalAnalyzer {
             "Y".into(), "Z".into(), "a".into(), "b".into(), "c".into(), "d".into(), "e".into(), "f".into(), "g".into(), "h".into(), "i".into(), "j".into(), "k".into(),
             "l".into(), "m".into(), "n".into(), "o".into(), "p".into(), "q".into(), "r".into(), "s".into(), "t".into(), "u".into(), "v".into(), "w".into(), "x".into(),
             "y".into(), "z".into(), "0".into(), "1".into(), "2".into(), "3".into(), "4".into(), "5".into(), "6".into(), "7".into(), "8".into(), "9".into(), ",".into(),
-            ".".into(), "\"".into(), ":".into(), "?".into(), "!".into(), "%".into(), "=".into(), "/".into(), "\\n".into(), "\\t".into()],
+            ".".into(), "\"".into(), ":".into(), "?".into(), "!".into(), "%".into(), "=".into(), "/".into(), "\n".into(), "\t".into(), ' '.into(), '\r'.into()],
         }
     } 
 
+    /*
+    So instead of tokenizing, since this is character by character analysis, I need to determine how to keep grabbing characters
+    until things are done. for tags, keep grabbing until there is a whitespace, i don't know how that will work with 
+    tags that are two words...
+    and with text, keep grabbing until there's a #
+    so really, I just need to figure out how to determine if it's a two word annotation....I should look at the annotations and
+    note if there are certain ones that are always two words
+     */
+
+    // so I need to keep track of if there is a #
+    // how do I want to do that??
     pub fn tokenize(&mut self) {
         loop {
             let c = self.get_char();
@@ -145,6 +158,23 @@ impl LolLexicalAnalyzer {
             self.tokens.push(std::mem::take(&mut self.current_build));
         }
         self.tokens.reverse();
+    }
+
+    pub fn get_next_token(&mut self) -> String {
+        let mut c: char = self.get_char();
+        // i'm currently thinking that i could somewhat reuse this condition's logic for when text has to be one word
+        if c == '#' || self.position != 0 && !self.tokens.is_empty() && (self.tokens[self.position-1] == "#GIMMEH" || self.tokens[self.position-1] == "#MAEK" || self.tokens[self.position-1] == "#gimmeh" || self.tokens[self.position-1] == "#maek") {
+            while !c.is_whitespace() {
+                self.add_char(c);
+                c = self.get_char();
+            }
+            self.tokens.push(self.current_build.clone());
+            return self.current_build.clone()
+        } else { // this must be text, so one character is a token
+             self.current_build.clear(); // clear the current build so only one character is returned
+            self.add_char(c);
+            return self.current_build.clone()
+        }
     }
 }
 
@@ -169,6 +199,29 @@ impl LexicalAnalyzer for LolLexicalAnalyzer {
             || self.verbs.iter().any(|v| v == s)
             || self.adverbs.iter().any(|adv| adv == s)
             || self.adjectives.iter().any(|adj| adj == s)
+
+            || self.hai.iter().any(|hai: &String| hai == s)
+            || self.kbye.iter().any(|kbye: &String| kbye == s)
+            || self.obtw.iter().any(|obtw: &String| obtw == s)
+            || self.tldr.iter().any(|tldr: &String| tldr == s)
+            || self.maek.iter().any(|maek: &String| maek == s)
+            || self.oic.iter().any(|oic: &String| oic == s)
+            || self.gimmeh.iter().any(|gim: &String| gim == s)
+            || self.mkay.iter().any(|mkay: &String| mkay == s)
+            || self.head.iter().any(|head: &String| head == s)
+            || self.title.iter().any(|title: &String| title == s)
+            || self.paragraf.iter().any(|para: &String| para == s)
+            || self.bold.iter().any(|bold: &String| bold == s)
+            || self.list.iter().any(|list: &String| list == s)
+            || self.item.iter().any(|item: &String| item == s)
+            || self.newline.iter().any(|new: &String| new == s)
+            || self.linx.iter().any(|linx: &String| linx == s)
+            || self.ihaz.iter().any(|haz: &String| haz == s)
+            || self.itiz.iter().any(|itiz: &String| itiz == s)
+            || self.var.iter().any(|var: &String| var == s)
+            || self.text.iter().any(|txt: &String| txt == s)
+
+
     }
 }
 
@@ -193,11 +246,12 @@ impl LolspeakCompiler {
     }
 
     fn start(&mut self) {
-        let candidate = self.lexer.tokens.pop().unwrap_or_default();
+        let candidate = self.lexer.get_next_token();
         if self.lexer.lookup(&candidate) {
             self.current_tok = candidate;
+            print!("{}", self.current_tok);
         } else if !candidate.is_empty() {
-            eprintln!("Lexical error: '{}' is not a recognized token.", candidate);
+            eprintln!("Lexical error: '{:?}' is not a recognized token.", candidate);
             std::process::exit(1);
         } else {
             eprintln!("User error: The provided sentence is empty.");
@@ -210,6 +264,7 @@ impl LolspeakCompiler {
     #[inline] fn is_verb(&self, s: &str) -> bool { self.lexer.verbs.iter().any(|v| v == s) }
     #[inline] fn is_adverb(&self, s: &str) -> bool { self.lexer.adverbs.iter().any(|adv| adv == s) }
     #[inline] fn is_adjective(&self, s: &str) -> bool { self.lexer.adjectives.iter().any(|adj| adj == s) }
+    #[inline] fn is_text(&self, s: &str) -> bool { self.lexer.text.iter().any(|txt: &String| txt == s)}
 
     fn article(&mut self) {
         if self.is_article(&self.current_tok) {
@@ -254,26 +309,61 @@ impl LolspeakCompiler {
     }
 
     fn lolspeak(&mut self) {
-        self.noun_phrase();
-        if self.is_adverb(&self.current_tok) {
-            let _ = self.next_token();
-        }
-        self.verb();
-        self.noun_phrase();
+        self.text_list();
+        // self.noun_phrase();
+        // if self.is_adverb(&self.current_tok) {
+        //     let _ = self.next_token();
+        // }
+        // self.verb();
+        // self.noun_phrase();
     }
+
+    // implemented now to test lexer rules for text. As of now, things seem to be working
+    fn text_list(&mut self) {
+        if self.is_text(&self.current_tok) {
+            self.text();
+            self.text_list();
+        }
+    }
+
+    fn text(&mut self) {
+        if self.is_text(&self.current_tok) {
+            // add token to parse tree: to be done
+            self.next_token();
+        }
+    }
+
+    // fn adjective_list(&mut self) {
+    //     if self.lexer.is_an_adjective(&self.compiler.current_token) {
+    //         self.adjective();
+    //         self.adjective_list();
+    //     }
+    // }
+    
+    
+    // fn adjective(&mut self) {
+    //     if self.lexer.is_an_adjective(&self.compiler.current_token) {
+    //         // add token to the parse tree
+    //         // get the next token
+    //         self.next_token();
+    //      }
+    // }
+
+
 }
 
 impl Compiler for LolspeakCompiler {
     fn compile(&mut self, source: &str) {
         self.lexer = LolLexicalAnalyzer::new(source);
-        self.lexer.tokenize();
+        //self.lexer.tokenize();
         self.start();
     }
 
     fn next_token(&mut self) -> String {
-        let candidate = self.lexer.tokens.pop().unwrap_or_default();
+        let candidate = self.lexer.get_next_token();
         if self.lexer.lookup(&candidate) {
             self.current_tok = candidate.clone();
+            print!("{}", self.current_tok);
             candidate
         } else if self.lexer.tokens.is_empty() {
             self.current_tok.clear();
@@ -318,4 +408,5 @@ fn main() {
     compiler.compile(&sentence);
     compiler.parse();
 
-    println!("The sentence '{}' follows the lolspeak grammar!", sentence.trim());}
+   // println!("The sentence '{}' follows the lolspeak grammar!", sentence.trim());
+}
