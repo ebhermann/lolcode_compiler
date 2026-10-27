@@ -140,40 +140,55 @@ impl LolLexicalAnalyzer {
 
     // so I need to keep track of if there is a #
     // how do I want to do that??
-    pub fn tokenize(&mut self) {
-        loop {
-            let c = self.get_char();
-            if c == '\0' {
-                break;
-            }
-            if c.is_whitespace() {
-                if !self.current_build.is_empty() {
-                    self.tokens.push(std::mem::take(&mut self.current_build));
-                }
-            } else {
-                self.add_char(c);
-            }
-        }
-        if !self.current_build.is_empty() {
-            self.tokens.push(std::mem::take(&mut self.current_build));
-        }
-        self.tokens.reverse();
-    }
+    // pub fn tokenize(&mut self) {
+    //     loop {
+    //         let c = self.get_char();
+    //         if c == '\0' {
+    //             break;
+    //         }
+    //         if c.is_whitespace() {
+    //             if !self.current_build.is_empty() {
+    //                 self.tokens.push(std::mem::take(&mut self.current_build));
+    //             }
+    //         } else {
+    //             self.add_char(c);
+    //         }
+    //     }
+    //     if !self.current_build.is_empty() {
+    //         self.tokens.push(std::mem::take(&mut self.current_build));
+    //     }
+    //     self.tokens.reverse();
+    // }
 
     pub fn get_next_token(&mut self) -> String {
         let mut c: char = self.get_char();
+
+        if c == '\0' {
+            return String::new();
+        }
         // i'm currently thinking that i could somewhat reuse this condition's logic for when text has to be one word
-        if c == '#' || self.position != 0 && !self.tokens.is_empty() && (self.tokens[self.position-1] == "#GIMMEH" || self.tokens[self.position-1] == "#MAEK" || self.tokens[self.position-1] == "#gimmeh" || self.tokens[self.position-1] == "#maek") {
+        if c == '#' || self.previous_token == "#GIMMEH" || self.previous_token == "#MAEK" || self.previous_token == "#gimmeh" || self.previous_token == "#maek" {
+        //self.position != 0 && !self.tokens.is_empty() && (self.tokens[self.position-1] == "#GIMMEH" || self.tokens[self.position-1] == "#MAEK" || self.tokens[self.position-1] == "#gimmeh" || self.tokens[self.position-1] == "#maek") {
             while !c.is_whitespace() {
+                if c == '\0' {
+                    break;
+                }
                 self.add_char(c);
                 c = self.get_char();
             }
             self.tokens.push(self.current_build.clone());
+            self.previous_token = self.current_build.clone();
             return self.current_build.clone()
         } else { // this must be text, so one character is a token
-             self.current_build.clear(); // clear the current build so only one character is returned
+            self.current_build.clear(); // clear the current build so only one character is returned
+         //   if c != '\0' {
             self.add_char(c);
+            self.previous_token = self.current_build.clone();
             return self.current_build.clone()
+            // } else {
+            //   //  return self.previous_token.clone()
+              
+            // }
         }
     }
 }
@@ -259,56 +274,59 @@ impl LolspeakCompiler {
         }
     }
 
-    #[inline] fn is_article(&self, s: &str) -> bool { self.lexer.articles.iter().any(|a| a == s) }
-    #[inline] fn is_noun(&self, s: &str) -> bool { self.lexer.nouns.iter().any(|n| n == s) }
-    #[inline] fn is_verb(&self, s: &str) -> bool { self.lexer.verbs.iter().any(|v| v == s) }
-    #[inline] fn is_adverb(&self, s: &str) -> bool { self.lexer.adverbs.iter().any(|adv| adv == s) }
-    #[inline] fn is_adjective(&self, s: &str) -> bool { self.lexer.adjectives.iter().any(|adj| adj == s) }
+    // #[inline] fn is_article(&self, s: &str) -> bool { self.lexer.articles.iter().any(|a| a == s) }
+    // #[inline] fn is_noun(&self, s: &str) -> bool { self.lexer.nouns.iter().any(|n| n == s) }
+    // #[inline] fn is_verb(&self, s: &str) -> bool { self.lexer.verbs.iter().any(|v| v == s) }
+    // #[inline] fn is_adverb(&self, s: &str) -> bool { self.lexer.adverbs.iter().any(|adv| adv == s) }
+    // #[inline] fn is_adjective(&self, s: &str) -> bool { self.lexer.adjectives.iter().any(|adj| adj == s) }
+
     #[inline] fn is_text(&self, s: &str) -> bool { self.lexer.text.iter().any(|txt: &String| txt == s)}
+    #[inline] fn is_hai(&self, s: &str) -> bool { self.lexer.hai.iter().any(|hai: &String| hai == s)}
 
-    fn article(&mut self) {
-        if self.is_article(&self.current_tok) {
-            let _ = self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when an article (a, teh) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
+    // fn article(&mut self) {
+    //     if self.is_article(&self.current_tok) {
+    //         let _ = self.next_token();
+    //     } else {
+    //         eprintln!("Syntax error: '{}' was found when an article (a, teh) was expected.", self.current_tok);
+    //         std::process::exit(1);
+    //     }
+    // }
 
-    fn adjective(&mut self) {
-        if self.is_adjective(&self.current_tok) {
-            let _ = self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when an adjective (fat, hungry, happy, mean) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
+    // fn adjective(&mut self) {
+    //     if self.is_adjective(&self.current_tok) {
+    //         let _ = self.next_token();
+    //     } else {
+    //         eprintln!("Syntax error: '{}' was found when an adjective (fat, hungry, happy, mean) was expected.", self.current_tok);
+    //         std::process::exit(1);
+    //     }
+    // }
 
-    fn noun(&mut self) {
-        if self.is_noun(&self.current_tok) {
-            let _ = self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when a noun (dawg, kat, rat) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
+    // fn noun(&mut self) {
+    //     if self.is_noun(&self.current_tok) {
+    //         let _ = self.next_token();
+    //     } else {
+    //         eprintln!("Syntax error: '{}' was found when a noun (dawg, kat, rat) was expected.", self.current_tok);
+    //         std::process::exit(1);
+    //     }
+    // }
 
-    fn verb(&mut self) {
-        if self.is_verb(&self.current_tok) {
-            let _ = self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when a verb (lovez, hatez, ates) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
+    // fn verb(&mut self) {
+    //     if self.is_verb(&self.current_tok) {
+    //         let _ = self.next_token();
+    //     } else {
+    //         eprintln!("Syntax error: '{}' was found when a verb (lovez, hatez, ates) was expected.", self.current_tok);
+    //         std::process::exit(1);
+    //     }
+    // }
 
-    fn noun_phrase(&mut self) {
-        self.article();
-        self.adjective();
-        self.noun();
-    }
+    // fn noun_phrase(&mut self) {
+    //     self.article();
+    //     self.adjective();
+    //     self.noun();
+    // }
 
     fn lolspeak(&mut self) {
+        self.hai();
         self.text_list();
         // self.noun_phrase();
         // if self.is_adverb(&self.current_tok) {
@@ -330,6 +348,16 @@ impl LolspeakCompiler {
         if self.is_text(&self.current_tok) {
             // add token to parse tree: to be done
             self.next_token();
+        }
+    }
+
+    fn hai(&mut self) {
+        if self.is_hai(&self.current_tok) {
+            // add token to parse tree: to be done
+            self.next_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when hai annotation (#HAI, #hai) was expected.", self.current_tok);
+            std::process::exit(1);
         }
     }
 
@@ -355,7 +383,6 @@ impl LolspeakCompiler {
 impl Compiler for LolspeakCompiler {
     fn compile(&mut self, source: &str) {
         self.lexer = LolLexicalAnalyzer::new(source);
-        //self.lexer.tokenize();
         self.start();
     }
 
@@ -365,18 +392,18 @@ impl Compiler for LolspeakCompiler {
             self.current_tok = candidate.clone();
             print!("{}", self.current_tok);
             candidate
-        } else if self.lexer.tokens.is_empty() {
+        } else if candidate.is_empty() {
             self.current_tok.clear();
             String::new()
         } else {
-            eprintln!("Lexical error: '{}' is not a recognized token.", candidate);
+            eprintln!("Lexical error: '{:?}' is not a recognized token.", candidate);
             std::process::exit(1);
         }
     }
 
     fn parse(&mut self) {
         self.lolspeak();
-        if !self.lexer.tokens.is_empty() || !self.current_tok.is_empty() {
+        if !self.current_tok.is_empty() {
             eprintln!("Syntax error: Additional tokens found after the sentence.");
             std::process::exit(1);
         }
