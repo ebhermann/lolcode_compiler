@@ -54,11 +54,6 @@ pub struct LolLexicalAnalyzer {
     current_build: String,
     pub tokens: Vec<String>,
     pub previous_token: String,
-    pub articles: Vec<String>,
-    pub verbs: Vec<String>,
-    pub nouns: Vec<String>,
-    pub adverbs: Vec<String>,
-    pub adjectives: Vec<String>,
 
     pub hai: Vec<String>,
     pub kbye: Vec<String>,
@@ -79,12 +74,13 @@ pub struct LolLexicalAnalyzer {
     pub ihaz: Vec<String>,
     pub itiz: Vec<String>,
     pub var: Vec<String>,
+    pub varname: Vec<String>,
     pub text: Vec<String>,
+    pub address: Vec<String>,
 
 
-
-    // terminals from the solution BNF that I'm not including for now: varname, varvalue, address
-    // I think those (except maybe address) could be enforced in syntax analysis
+    // terminal from the solution BNF that I'm not including for now: varvalue
+    // as of now, I think varvalue is just text, so that doesn't seem to need its own lexical rule
 }
 
 impl LolLexicalAnalyzer {
@@ -95,11 +91,6 @@ impl LolLexicalAnalyzer {
             current_build: String::new(),
             tokens: Vec::new(),
             previous_token: String::new(),
-            articles: vec!["a".into(), "teh".into()],
-            verbs: vec!["lovez".into(), "hatez".into(), "ates".into()],
-            nouns: vec!["dawg".into(), "kat".into(), "rat".into()],
-            adverbs: vec!["accidently".into(), "quickly".into(), "secretly".into()],
-            adjectives: vec!["fat".into(), "hungry".into(), "happy".into(), "mean".into()],
             
             hai: vec!["#HAI".into(), "#hai".into()],
             kbye: vec!["#KBYE".into(), "#kbye".into()],
@@ -120,56 +111,38 @@ impl LolLexicalAnalyzer {
             ihaz: vec!["#IHAZ".into(), "#ihaz".into()],
             itiz: vec!["#ITIZ".into(), "#itiz".into()],
             var: vec!["VAR".into(), "var".into()],
+            varname: vec!["A".into(), "B".into(), "C".into(), "D".into(), "E".into(), "F".into(), "G".into(), "H".into(), "I".into(), "J".into(), "K".into(),
+            "L".into(), "M".into(), "N".into(), "O".into(), "P".into(), "Q".into(), "R".into(), "S".into(), "T".into(), "U".into(), "V".into(), "W".into(), "X".into(),
+            "Y".into(), "Z".into(), "a".into(), "b".into(), "c".into(), "d".into(), "e".into(), "f".into(), "g".into(), "h".into(), "i".into(), "j".into(), "k".into(),
+            "l".into(), "m".into(), "n".into(), "o".into(), "p".into(), "q".into(), "r".into(), "s".into(), "t".into(), "u".into(), "v".into(), "w".into(), "x".into(),
+            "y".into(), "z".into()],
             text: vec!["A".into(), "B".into(), "C".into(), "D".into(), "E".into(), "F".into(), "G".into(), "H".into(), "I".into(), "J".into(), "K".into(),
             "L".into(), "M".into(), "N".into(), "O".into(), "P".into(), "Q".into(), "R".into(), "S".into(), "T".into(), "U".into(), "V".into(), "W".into(), "X".into(),
             "Y".into(), "Z".into(), "a".into(), "b".into(), "c".into(), "d".into(), "e".into(), "f".into(), "g".into(), "h".into(), "i".into(), "j".into(), "k".into(),
             "l".into(), "m".into(), "n".into(), "o".into(), "p".into(), "q".into(), "r".into(), "s".into(), "t".into(), "u".into(), "v".into(), "w".into(), "x".into(),
             "y".into(), "z".into(), "0".into(), "1".into(), "2".into(), "3".into(), "4".into(), "5".into(), "6".into(), "7".into(), "8".into(), "9".into(), ",".into(),
             ".".into(), "\"".into(), ":".into(), "?".into(), "!".into(), "%".into(), "=".into(), "/".into(), "\n".into(), "\t".into(), ' '.into(), '\r'.into()],
+            address: vec!["A".into(), "B".into(), "C".into(), "D".into(), "E".into(), "F".into(), "G".into(), "H".into(), "I".into(), "J".into(), "K".into(),
+            "L".into(), "M".into(), "N".into(), "O".into(), "P".into(), "Q".into(), "R".into(), "S".into(), "T".into(), "U".into(), "V".into(), "W".into(), "X".into(),
+            "Y".into(), "Z".into(), "a".into(), "b".into(), "c".into(), "d".into(), "e".into(), "f".into(), "g".into(), "h".into(), "i".into(), "j".into(), "k".into(),
+            "l".into(), "m".into(), "n".into(), "o".into(), "p".into(), "q".into(), "r".into(), "s".into(), "t".into(), "u".into(), "v".into(), "w".into(), "x".into(),
+            "y".into(), "z".into(), "0".into(), "1".into(), "2".into(), "3".into(), "4".into(), "5".into(), "6".into(), "7".into(), "8".into(), "9".into(), ",".into(),
+            ".".into(), "\"".into(), ":".into(), "?".into(), "!".into(), "%".into(), "=".into(), "/".into()],
         }
     } 
 
-    /*
-    So instead of tokenizing, since this is character by character analysis, I need to determine how to keep grabbing characters
-    until things are done. for tags, keep grabbing until there is a whitespace, i don't know how that will work with 
-    tags that are two words...
-    and with text, keep grabbing until there's a #
-    so really, I just need to figure out how to determine if it's a two word annotation....I should look at the annotations and
-    note if there are certain ones that are always two words
-     */
 
-    // so I need to keep track of if there is a #
-    // how do I want to do that??
-    // pub fn tokenize(&mut self) {
-    //     loop {
-    //         let c = self.get_char();
-    //         if c == '\0' {
-    //             break;
-    //         }
-    //         if c.is_whitespace() {
-    //             if !self.current_build.is_empty() {
-    //                 self.tokens.push(std::mem::take(&mut self.current_build));
-    //             }
-    //         } else {
-    //             self.add_char(c);
-    //         }
-    //     }
-    //     if !self.current_build.is_empty() {
-    //         self.tokens.push(std::mem::take(&mut self.current_build));
-    //     }
-    //     self.tokens.reverse();
-    // }
-
+    // TODO: EVALUATE TO SEE IF THESE WILL WORK WITH VARNAME AND ADDRESS
+    // Current assumption is that they should work under the else branch
     pub fn get_next_token(&mut self) -> String {
+        self.current_build.clear();
         let mut c: char = self.get_char();
 
         if c == '\0' {
             return String::new();
         }
-        // i'm currently thinking that i could somewhat reuse this condition's logic for when text has to be one word
         if c == '#' || self.previous_token == "#GIMMEH" || self.previous_token == "#MAEK" || self.previous_token == "#gimmeh" || self.previous_token == "#maek" {
-        //self.position != 0 && !self.tokens.is_empty() && (self.tokens[self.position-1] == "#GIMMEH" || self.tokens[self.position-1] == "#MAEK" || self.tokens[self.position-1] == "#gimmeh" || self.tokens[self.position-1] == "#maek") {
-            while !c.is_whitespace() {
+            while !c.is_whitespace() { //ignoring that this loses a whitespace token for now because I should still be able to translate to HTML
                 if c == '\0' {
                     break;
                 }
@@ -180,15 +153,9 @@ impl LolLexicalAnalyzer {
             self.previous_token = self.current_build.clone();
             return self.current_build.clone()
         } else { // this must be text, so one character is a token
-            self.current_build.clear(); // clear the current build so only one character is returned
-         //   if c != '\0' {
             self.add_char(c);
             self.previous_token = self.current_build.clone();
             return self.current_build.clone()
-            // } else {
-            //   //  return self.previous_token.clone()
-              
-            // }
         }
     }
 }
@@ -209,13 +176,7 @@ impl LexicalAnalyzer for LolLexicalAnalyzer {
     }
 
     fn lookup(&self, s: &str) -> bool {
-        self.articles.iter().any(|a| a == s)
-            || self.nouns.iter().any(|n| n == s)
-            || self.verbs.iter().any(|v| v == s)
-            || self.adverbs.iter().any(|adv| adv == s)
-            || self.adjectives.iter().any(|adj| adj == s)
-
-            || self.hai.iter().any(|hai: &String| hai == s)
+            self.hai.iter().any(|hai: &String| hai == s)
             || self.kbye.iter().any(|kbye: &String| kbye == s)
             || self.obtw.iter().any(|obtw: &String| obtw == s)
             || self.tldr.iter().any(|tldr: &String| tldr == s)
@@ -235,7 +196,7 @@ impl LexicalAnalyzer for LolLexicalAnalyzer {
             || self.itiz.iter().any(|itiz: &String| itiz == s)
             || self.var.iter().any(|var: &String| var == s)
             || self.text.iter().any(|txt: &String| txt == s)
-
+        // Var name and address are not included here because they're composed of valid tokens, which are checked under text
 
     }
 }
@@ -245,8 +206,6 @@ impl LexicalAnalyzer for LolLexicalAnalyzer {
 //
 
 
-/// <sentence>    ::= <noun_phrase> [<adverb>] <verb> <noun_phrase>
-/// <noun_phrase> ::= <article> <adjective> <noun>
 pub struct LolspeakCompiler {
     lexer: LolLexicalAnalyzer,
     current_tok: String,
@@ -274,66 +233,19 @@ impl LolspeakCompiler {
         }
     }
 
-    // #[inline] fn is_article(&self, s: &str) -> bool { self.lexer.articles.iter().any(|a| a == s) }
-    // #[inline] fn is_noun(&self, s: &str) -> bool { self.lexer.nouns.iter().any(|n| n == s) }
-    // #[inline] fn is_verb(&self, s: &str) -> bool { self.lexer.verbs.iter().any(|v| v == s) }
-    // #[inline] fn is_adverb(&self, s: &str) -> bool { self.lexer.adverbs.iter().any(|adv| adv == s) }
-    // #[inline] fn is_adjective(&self, s: &str) -> bool { self.lexer.adjectives.iter().any(|adj| adj == s) }
 
     #[inline] fn is_text(&self, s: &str) -> bool { self.lexer.text.iter().any(|txt: &String| txt == s)}
     #[inline] fn is_hai(&self, s: &str) -> bool { self.lexer.hai.iter().any(|hai: &String| hai == s)}
+    #[inline] fn is_maek(&self, s: &str) -> bool { self.lexer.maek.iter().any(|maek: &String| maek == s)}
+    #[inline] fn is_paragraf(&self, s: &str) -> bool { self.lexer.paragraf.iter().any(|para: &String| para == s)}
+  
 
-    // fn article(&mut self) {
-    //     if self.is_article(&self.current_tok) {
-    //         let _ = self.next_token();
-    //     } else {
-    //         eprintln!("Syntax error: '{}' was found when an article (a, teh) was expected.", self.current_tok);
-    //         std::process::exit(1);
-    //     }
-    // }
-
-    // fn adjective(&mut self) {
-    //     if self.is_adjective(&self.current_tok) {
-    //         let _ = self.next_token();
-    //     } else {
-    //         eprintln!("Syntax error: '{}' was found when an adjective (fat, hungry, happy, mean) was expected.", self.current_tok);
-    //         std::process::exit(1);
-    //     }
-    // }
-
-    // fn noun(&mut self) {
-    //     if self.is_noun(&self.current_tok) {
-    //         let _ = self.next_token();
-    //     } else {
-    //         eprintln!("Syntax error: '{}' was found when a noun (dawg, kat, rat) was expected.", self.current_tok);
-    //         std::process::exit(1);
-    //     }
-    // }
-
-    // fn verb(&mut self) {
-    //     if self.is_verb(&self.current_tok) {
-    //         let _ = self.next_token();
-    //     } else {
-    //         eprintln!("Syntax error: '{}' was found when a verb (lovez, hatez, ates) was expected.", self.current_tok);
-    //         std::process::exit(1);
-    //     }
-    // }
-
-    // fn noun_phrase(&mut self) {
-    //     self.article();
-    //     self.adjective();
-    //     self.noun();
-    // }
-
+    // VARNAME AND ADDRESS NEED TO BE ADDED HERE TO TEST LEXER BEFORE MOVING ONTO SYNTAX ANALYSIS
     fn lolspeak(&mut self) {
         self.hai();
+        self.maek();
+        self.paragraf();
         self.text_list();
-        // self.noun_phrase();
-        // if self.is_adverb(&self.current_tok) {
-        //     let _ = self.next_token();
-        // }
-        // self.verb();
-        // self.noun_phrase();
     }
 
     // implemented now to test lexer rules for text. As of now, things seem to be working
@@ -356,26 +268,30 @@ impl LolspeakCompiler {
             // add token to parse tree: to be done
             self.next_token();
         } else {
-            eprintln!("Syntax error: '{}' was found when hai annotation (#HAI, #hai) was expected.", self.current_tok);
+            eprintln!("Syntax error: '{}' was found when the hai annotation (#HAI, #hai) was expected.", self.current_tok);
             std::process::exit(1);
         }
     }
 
-    // fn adjective_list(&mut self) {
-    //     if self.lexer.is_an_adjective(&self.compiler.current_token) {
-    //         self.adjective();
-    //         self.adjective_list();
-    //     }
-    // }
-    
-    
-    // fn adjective(&mut self) {
-    //     if self.lexer.is_an_adjective(&self.compiler.current_token) {
-    //         // add token to the parse tree
-    //         // get the next token
-    //         self.next_token();
-    //      }
-    // }
+    fn maek(&mut self) {
+        if self.is_maek(&self.current_tok) {
+            // add token to parse tree: to be done
+            self.next_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the maek annotation (#MAEK, #maek) was expected.", self.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+    fn paragraf(&mut self) {
+        if self.is_paragraf(&self.current_tok) {
+            // add token to parse tree: to be done
+            self.next_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the paragraf annotation (#PARAGRAF, #paragraf) was expected.", self.current_tok);
+            std::process::exit(1);
+        }
+    }
 
 
 }
@@ -425,6 +341,7 @@ fn main() {
         std::process::exit(1);
     }
 
+    // compiler can currently read from a file with a .lol extension, but need to add the functionality that prevents it from reading other file types
     let filename = &args[1];
     let sentence = fs::read_to_string(filename).unwrap_or_else(|err| {
         eprintln!("Error reading file '{}': {}", filename, err);
