@@ -238,6 +238,8 @@ impl LolspeakCompiler {
     #[inline] fn is_hai(&self, s: &str) -> bool { self.lexer.hai.iter().any(|hai: &String| hai == s)}
     #[inline] fn is_maek(&self, s: &str) -> bool { self.lexer.maek.iter().any(|maek: &String| maek == s)}
     #[inline] fn is_paragraf(&self, s: &str) -> bool { self.lexer.paragraf.iter().any(|para: &String| para == s)}
+    #[inline] fn is_gimmeh(&self, s: &str) -> bool { self.lexer.gimmeh.iter().any(|gimmeh: &String| gimmeh == s)}
+    #[inline] fn is_bold(&self, s: &str) -> bool { self.lexer.bold.iter().any(|bold: &String| bold == s)}
   
 
     // VARNAME AND ADDRESS NEED TO BE ADDED HERE TO TEST LEXER BEFORE MOVING ONTO SYNTAX ANALYSIS
@@ -245,7 +247,11 @@ impl LolspeakCompiler {
         self.hai();
         self.maek();
         self.paragraf();
+        self.gimmeh();
+        self.bold();
         self.text_list();
+        self.gimmeh();
+        self.bold();
     }
 
     // implemented now to test lexer rules for text. As of now, things seem to be working
@@ -288,7 +294,27 @@ impl LolspeakCompiler {
             // add token to parse tree: to be done
             self.next_token();
         } else {
-            eprintln!("Syntax error: '{}' was found when the paragraf annotation (#PARAGRAF, #paragraf) was expected.", self.current_tok);
+            eprintln!("Syntax error: '{}' was found when the paragraf annotation (PARAGRAF, paragraf) was expected.", self.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+    fn gimmeh(&mut self) {
+        if self.is_gimmeh(&self.current_tok) {
+            // add token to parse tree: to be done
+            self.next_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the gimmeh annotation (#GIMMEH, #gimmeh) was expected.", self.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+    fn bold(&mut self) {
+        if self.is_bold(&self.current_tok) {
+            // add token to parse tree: to be done
+            self.next_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the bold annotation (BOLD, bold) was expected.", self.current_tok);
             std::process::exit(1);
         }
     }
