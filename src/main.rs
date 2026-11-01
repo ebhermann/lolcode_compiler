@@ -205,19 +205,267 @@ impl LexicalAnalyzer for LolLexicalAnalyzer {
 // ===================== Syntax Analyzer =====================
 //
 
+/// OPTION 1 - Trait for a recursive descent Syntax Analyzer 
+/// over Vec<String>. Each function parses a nonterminal in 
+/// the grammar. On error: exit immediately.
+pub trait SyntaxAnalyzer {
+    fn parse_lolcode(&mut self);        
+    fn parse_head(&mut self);           
+    fn parse_title(&mut self);         
+    fn parse_comment(&mut self);        
+    fn parse_body(&mut self);           
+    fn parse_paragraph(&mut self);      
+    fn parse_inner_paragraph(&mut self);
+    fn parse_inner_text(&mut self);     
+    fn parse_variable_define(&mut self);
+    fn parse_variable_use(&mut self);   
+    fn parse_bold(&mut self);           
+    fn parse_list(&mut self);           
+    fn parse_list_items(&mut self);     
+    fn parse_inner_list(&mut self);     
+    fn parse_link(&mut self);          
+    fn parse_newline(&mut self);        
+    fn parse_text(&mut self);           
+}
 
-pub struct LolspeakCompiler {
+// pub struct LolcodeSyntaxAnalyzer {
+//     lexer: LolLexicalAnalyzer,
+//     current_tok: String,
+//     parse_tree: Vec<String>,
+//     compiler: LolcodeCompiler,
+// }
+
+// impl LolcodeSyntaxAnalyzer {
+//     pub fn new() -> Self {
+//         Self {
+//             lexer: LolLexicalAnalyzer::new(""),
+//             current_tok: String::new(),
+//             parse_tree: Vec::new(),
+//             compiler: LolcodeCompiler::new(),
+//         }
+//     }
+
+pub struct LolcodeSyntaxAnalyzer<'a> {
+    parse_tree: Vec<String>,
+    compiler: &'a mut LolcodeCompiler,
+}
+
+impl<'a> LolcodeSyntaxAnalyzer<'a> {
+    pub fn new(compiler: &'a mut LolcodeCompiler) -> Self {
+        Self {
+            parse_tree: Vec::new(),
+            compiler,
+        }
+    }
+
+    #[inline] fn is_hai(&self, s: &str) -> bool { self.compiler.lexer.hai.iter().any(|hai: &String| hai == s)}
+    #[inline] fn is_obtw(&self, s: &str) -> bool { self.compiler.lexer.obtw.iter().any(|obtw: &String| obtw == s)}
+    #[inline] fn is_tldr(&self, s: &str) -> bool { self.compiler.lexer.tldr.iter().any(|tldr: &String| tldr == s)}
+    #[inline] fn is_maek(&self, s: &str) -> bool { self.compiler.lexer.maek.iter().any(|maek: &String| maek == s)}
+    #[inline] fn is_head(&self, s: &str) -> bool { self.compiler.lexer.head.iter().any(|head: &String| head == s)}
+    #[inline] fn is_mkay(&self, s: &str) -> bool { self.compiler.lexer.mkay.iter().any(|mkay: &String| mkay == s)}
+    #[inline] fn is_paragraf(&self, s: &str) -> bool { self.compiler.lexer.paragraf.iter().any(|para: &String| para == s)}
+    #[inline] fn is_gimmeh(&self, s: &str) -> bool { self.compiler.lexer.gimmeh.iter().any(|gimmeh: &String| gimmeh == s)}
+    #[inline] fn is_bold(&self, s: &str) -> bool { self.compiler.lexer.bold.iter().any(|bold: &String| bold == s)}
+    #[inline] fn is_text(&self, s: &str) -> bool { self.compiler.lexer.text.iter().any(|txt: &String| txt == s)}
+  
+
+
+    fn hai(&mut self) {
+        if self.is_hai(&self.compiler.current_tok) {
+            // add token to parse tree: to be done
+            self.compiler.next_syntax_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the hai annotation (#HAI, #hai) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+    fn comment_list(&mut self) {
+        if self.is_obtw(&self.compiler.current_tok) {
+            // add to parse tree
+            self.compiler.next_token();
+            self.comment();
+            self.comment_list();
+        }
+    }
+
+    fn comment(&mut self) {
+        if self.is_text(&self.compiler.current_tok) {
+            // add token to parse tree: to be done
+            self.text_list();
+
+            if self.is_tldr(&self.compiler.current_tok) {
+                // add to parse tree
+                self.compiler.next_syntax_token();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the tldr annotation (#TLDR, #tldr) was expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when text was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+    // fn maek(&mut self) {
+    //     if self.is_maek(&self.current_tok) {
+    //         // add token to parse tree: to be done
+    //         self.compiler.next_syntax_token();
+    //     } else {
+    //         eprintln!("Syntax error: '{}' was found when the maek annotation (#MAEK, #maek) was expected.", self.current_tok);
+    //         std::process::exit(1);
+    //     }
+    // }
+
+    fn paragraf(&mut self) {
+        if self.is_paragraf(&self.compiler.current_tok) {
+            // add token to parse tree: to be done
+            self.compiler.next_syntax_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the paragraf annotation (PARAGRAF, paragraf) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+    fn gimmeh(&mut self) {
+        if self.is_gimmeh(&self.compiler.current_tok) {
+            // add token to parse tree: to be done
+            self.compiler.next_syntax_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the gimmeh annotation (#GIMMEH, #gimmeh) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+    fn bold(&mut self) {
+        if self.is_bold(&self.compiler.current_tok) {
+            // add token to parse tree: to be done
+            self.compiler.next_syntax_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the bold annotation (BOLD, bold) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+
+     // implemented now to test lexer rules for text. As of now, things seem to be working
+    fn text_list(&mut self) {
+        if self.is_text(&self.compiler.current_tok) {
+            self.text();
+            self.text_list();
+        }
+    }
+
+    fn text(&mut self) {
+        if self.is_text(&self.compiler.current_tok) {
+            // add token to parse tree: to be done
+            self.compiler.next_token();
+        }
+    }
+}
+
+impl<'a> SyntaxAnalyzer for LolcodeSyntaxAnalyzer<'a>{
+    fn parse_lolcode(&mut self) {
+        self.hai();
+        self.parse_comment();
+        self.parse_head();
+    }
+    fn parse_head(&mut self) {
+        if self.is_maek(&self.compiler.current_tok) {
+            // add token to parse tree: to be done
+            self.compiler.next_syntax_token();
+
+            if self.is_head(&self.compiler.current_tok) {
+                // add to parse tree
+                self.compiler.next_syntax_token();
+                self.parse_title();
+
+                if self.is_mkay(&self.compiler.current_tok) {
+                    // add to parse tree
+                    self.compiler.next_syntax_token();
+                } else {
+                    eprintln!("Syntax error: '{:?}' was found when the mkay annotation (#MKAY, #mkay) was expected.", self.compiler.current_tok);
+                    std::process::exit(1);
+                }
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when the maek annotation (#MAEK, #maek) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }        
+
+    fn parse_title(&mut self) {
+        // hey homie i'm just chilling
+    }         
+    fn parse_comment(&mut self) {
+        self.comment_list();
+    }     
+    fn parse_body(&mut self) {
+
+    }         
+    fn parse_paragraph(&mut self) {
+
+    }    
+    fn parse_inner_paragraph(&mut self) {
+
+    }
+    fn parse_inner_text(&mut self) {
+
+    }   
+    fn parse_variable_define(&mut self) {
+
+    }
+    fn parse_variable_use(&mut self) {
+
+    } 
+    fn parse_bold(&mut self) {
+
+    }         
+    fn parse_list(&mut self) {
+
+    }         
+    fn parse_list_items(&mut self) {
+
+    }     
+    fn parse_inner_list(&mut self) {
+
+    }    
+    fn parse_link(&mut self) {
+
+    }        
+    fn parse_newline(&mut self) {
+
+    }      
+    fn parse_text(&mut self) {
+        self.text_list();
+    }
+
+    
+}
+
+
+pub struct LolcodeCompiler {
     lexer: LolLexicalAnalyzer,
     current_tok: String,
 }
 
-impl LolspeakCompiler {
+impl LolcodeCompiler {
     pub fn new() -> Self {
         Self {
             lexer: LolLexicalAnalyzer::new(""),
             current_tok: String::new(),
         }
     }
+
+    fn next_syntax_token(&mut self) {
+        let mut candidate = self.next_token();
+
+        while !candidate.is_empty() && candidate.chars().all(|c| c.is_whitespace()) {
+            candidate = self.next_token();
+        }
+    }
+
 
     fn start(&mut self) {
         let candidate = self.lexer.get_next_token();
@@ -233,94 +481,12 @@ impl LolspeakCompiler {
     }
 
 
-    #[inline] fn is_text(&self, s: &str) -> bool { self.lexer.text.iter().any(|txt: &String| txt == s)}
-    #[inline] fn is_hai(&self, s: &str) -> bool { self.lexer.hai.iter().any(|hai: &String| hai == s)}
-    #[inline] fn is_maek(&self, s: &str) -> bool { self.lexer.maek.iter().any(|maek: &String| maek == s)}
-    #[inline] fn is_paragraf(&self, s: &str) -> bool { self.lexer.paragraf.iter().any(|para: &String| para == s)}
-    #[inline] fn is_gimmeh(&self, s: &str) -> bool { self.lexer.gimmeh.iter().any(|gimmeh: &String| gimmeh == s)}
-    #[inline] fn is_bold(&self, s: &str) -> bool { self.lexer.bold.iter().any(|bold: &String| bold == s)}
-  
 
-    fn lolspeak(&mut self) {
-        self.hai();
-        self.maek();
-        self.paragraf();
-        self.gimmeh();
-        self.bold();
-        self.text_list();
-        self.gimmeh();
-        self.bold();
-    }
-
-    // implemented now to test lexer rules for text. As of now, things seem to be working
-    fn text_list(&mut self) {
-        if self.is_text(&self.current_tok) {
-            self.text();
-            self.text_list();
-        }
-    }
-
-    fn text(&mut self) {
-        if self.is_text(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        }
-    }
-
-    fn hai(&mut self) {
-        if self.is_hai(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the hai annotation (#HAI, #hai) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
-
-    fn maek(&mut self) {
-        if self.is_maek(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the maek annotation (#MAEK, #maek) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
-
-    fn paragraf(&mut self) {
-        if self.is_paragraf(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the paragraf annotation (PARAGRAF, paragraf) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
-
-    fn gimmeh(&mut self) {
-        if self.is_gimmeh(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the gimmeh annotation (#GIMMEH, #gimmeh) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
-
-    fn bold(&mut self) {
-        if self.is_bold(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the bold annotation (BOLD, bold) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
 
 
 }
 
-impl Compiler for LolspeakCompiler {
+impl Compiler for LolcodeCompiler {
     fn compile(&mut self, source: &str) {
         self.lexer = LolLexicalAnalyzer::new(source);
         self.start();
@@ -330,6 +496,7 @@ impl Compiler for LolspeakCompiler {
         let candidate = self.lexer.get_next_token();
         if self.lexer.lookup(&candidate) {
             self.current_tok = candidate.clone();
+            // need to delete this before submitting the project
             print!("{}", self.current_tok);
             candidate
         } else if candidate.is_empty() {
@@ -342,7 +509,10 @@ impl Compiler for LolspeakCompiler {
     }
 
     fn parse(&mut self) {
-        self.lolspeak();
+        {
+            let mut syntax_analyzer = LolcodeSyntaxAnalyzer::new(self);
+            syntax_analyzer.parse_lolcode();
+        }
         if !self.current_tok.is_empty() {
             eprintln!("Syntax error: Additional tokens found after the sentence.");
             std::process::exit(1);
@@ -372,7 +542,7 @@ fn main() {
         std::process::exit(1);
     });
 
-    let mut compiler = LolspeakCompiler::new();
+    let mut compiler = LolcodeCompiler::new();
     compiler.compile(&sentence);
     compiler.parse();
 
