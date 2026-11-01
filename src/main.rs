@@ -47,7 +47,6 @@ pub trait LexicalAnalyzer {
 
 
 /// A concrete implementation of the lexical analyzer.
-/// // DELETE ALL LOLSPEAK CODE FROM LAB 4
 pub struct LolLexicalAnalyzer {
     input: Vec<char>,
     position: usize,
@@ -132,8 +131,6 @@ impl LolLexicalAnalyzer {
     } 
 
 
-    // TODO: EVALUATE TO SEE IF THESE WILL WORK WITH VARNAME AND ADDRESS
-    // Current assumption is that they should work under the else branch
     pub fn get_next_token(&mut self) -> String {
         self.current_build.clear();
         let mut c: char = self.get_char();
@@ -143,6 +140,9 @@ impl LolLexicalAnalyzer {
         }
         if c == '#' || self.previous_token == "#GIMMEH" || self.previous_token == "#MAEK" || self.previous_token == "#gimmeh" || self.previous_token == "#maek" {
             while !c.is_whitespace() { //ignoring that this loses a whitespace token for now because I should still be able to translate to HTML
+                // add to condition: add the !/n, !/t (or whatever the tab is), and /r
+                // so this didn't fix it, but maybe there's a way i can add the fucntionality where if the previous character
+                // was a tag, ignore the whitespace
                 if c == '\0' {
                     break;
                 }
@@ -152,7 +152,7 @@ impl LolLexicalAnalyzer {
             self.tokens.push(self.current_build.clone());
             self.previous_token = self.current_build.clone();
             return self.current_build.clone()
-        } else { // this must be text, so one character is a token
+        } else { // this must be text, a varname, or an address, so one character is a token
             self.add_char(c);
             self.previous_token = self.current_build.clone();
             return self.current_build.clone()
@@ -223,9 +223,8 @@ impl LolspeakCompiler {
         let candidate = self.lexer.get_next_token();
         if self.lexer.lookup(&candidate) {
             self.current_tok = candidate;
-            print!("{}", self.current_tok);
         } else if !candidate.is_empty() {
-            eprintln!("Lexical error: '{:?}' is not a recognized token.", candidate);
+            eprintln!("Lexical error: '{}' is not a recognized token.", candidate);
             std::process::exit(1);
         } else {
             eprintln!("User error: The provided sentence is empty.");
@@ -242,7 +241,6 @@ impl LolspeakCompiler {
     #[inline] fn is_bold(&self, s: &str) -> bool { self.lexer.bold.iter().any(|bold: &String| bold == s)}
   
 
-    // VARNAME AND ADDRESS NEED TO BE ADDED HERE TO TEST LEXER BEFORE MOVING ONTO SYNTAX ANALYSIS
     fn lolspeak(&mut self) {
         self.hai();
         self.maek();
@@ -338,7 +336,7 @@ impl Compiler for LolspeakCompiler {
             self.current_tok.clear();
             String::new()
         } else {
-            eprintln!("Lexical error: '{:?}' is not a recognized token.", candidate);
+            eprintln!("Lexical error: '{}' is not a recognized token.", candidate);
             std::process::exit(1);
         }
     }
