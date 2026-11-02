@@ -1407,6 +1407,7 @@ fn main() {
         std::process::exit(1);
     } else if args.len() > 2 {
         eprintln!("Usage error: Too many arguments");
+        std::process::exit(1);
     }
 
     // Prevents compiler from reading any files without a .lol extension
