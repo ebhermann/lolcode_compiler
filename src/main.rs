@@ -319,6 +319,9 @@ impl<'a> LolcodeSyntaxAnalyzer<'a> {
             self.add_to_parse_tree();
             self.compiler.next_syntax_token();
             if self.is_item(&self.compiler.current_tok) {
+                // adds item to parse tree
+                self.add_to_parse_tree();
+                self.compiler.next_syntax_token();
                 self.parse_variable_define();
                 self.parse_inner_list();
                 if self.is_oic(&self.compiler.current_tok) {
@@ -449,9 +452,6 @@ impl<'a> SyntaxAnalyzer for LolcodeSyntaxAnalyzer<'a>{
                     std::process::exit(1);
                 }
             }
-        } else {
-            eprintln!("Syntax error: '{}' was found when the maek annotation (#MAEK, #maek) was expected.", self.compiler.current_tok);
-            std::process::exit(1);
         }
     }        
 
@@ -800,7 +800,14 @@ impl LolcodeCompiler {
 
 
     fn start(&mut self) {
-        let candidate = self.lexer.get_next_token();
+
+        let mut candidate = self.lexer.get_next_token();
+
+        // Skip whitespace before the first annotation
+        while !candidate.is_empty() && candidate.chars().all(|c| c.is_whitespace()) {
+            candidate = self.lexer.get_next_token();
+        }
+
         if self.lexer.lookup(&candidate) {
             self.current_tok = candidate;
         } else if !candidate.is_empty() {
@@ -846,7 +853,7 @@ impl Compiler for LolcodeCompiler {
             syntax_analyzer.parse_lolcode();
         }
         if !self.current_tok.is_empty() {
-            eprintln!("Syntax error: Additional tokens found after the sentence.");
+            eprintln!("Syntax error: Additional tokens found after the kbye annotation.");
             std::process::exit(1);
         }
     }
@@ -867,8 +874,21 @@ fn main() {
         std::process::exit(1);
     }
 
-    // compiler can currently read from a file with a .lol extension, but need to add the functionality that prevents it from reading other file types
+    // Prevents compiler from reading any files without a .lol extension
     let filename = &args[1];
+    let mut extension = String::new();
+    for c in filename.chars().rev() {
+        if c == '.' {
+            break;
+        }
+        extension.push(c);    
+    }
+
+    if extension != "lol" {
+        eprintln!("Usage error. Extension must be .lol Found extension .{}", extension);
+        std::process::exit(1);
+    }
+
     let sentence = fs::read_to_string(filename).unwrap_or_else(|err| {
         eprintln!("Error reading file '{}': {}", filename, err);
         std::process::exit(1);
