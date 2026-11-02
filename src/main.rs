@@ -1,5 +1,7 @@
 use std::env;
 use std::fs;
+use std::path::Path;
+use std::process::Command;
 
 //
 // ===================== Compiler Trait =====================
@@ -230,7 +232,7 @@ pub trait SyntaxAnalyzer {
 
 
 pub struct LolcodeSyntaxAnalyzer<'a> {
-    parse_tree: Vec<String>,
+    pub parse_tree: Vec<String>,
     compiler: &'a mut LolcodeCompiler,
 }
 
@@ -776,10 +778,451 @@ impl<'a> SyntaxAnalyzer for LolcodeSyntaxAnalyzer<'a>{
     
 }
 
+use std::collections::HashMap;
+
+pub struct LolcodeSemanticAnalyzer {
+    parse_tree: Vec<String>,
+    resolved_parse_tree: Vec<String>,
+    active_scope_stack: Vec<HashMap<String, String>>,
+}
+
+impl LolcodeSemanticAnalyzer {
+    pub fn new(parse_tree: Vec<String>) -> Self {
+        Self {
+            parse_tree,
+            resolved_parse_tree: Vec::new(),
+            active_scope_stack: Vec::new(),
+        }
+    }
+
+    fn semantic_analysis(&mut self) -> Vec<String> {
+        self.push_scope();
+        self.process_tokens(0, self.parse_tree.len());
+        self.pop_scope();
+
+        self.resolved_parse_tree.clone()
+    }
+
+    fn process_tokens(&mut self, start: usize, end: usize) {
+        let mut i = start;
+
+        while i < end {
+            let token = self.parse_tree[i].clone();
+
+            if token == "#IHAZ" || token == "#ihaz" {
+                i = self.define_variable(i, end);
+            }
+
+            else if token == "#GIMMEH" || token == "#gimmeh" {
+                if i + 1 < end
+                    && (self.parse_tree[i + 1] == "VAR"
+                    || self.parse_tree[i + 1] == "var")
+                {
+                    i = self.resolve_variable(i, end);
+                } else {
+                    self.resolved_parse_tree.push(token);
+                    i += 1;
+                }
+            }
+
+            else if token == "#MAEK" || token == "#maek" {
+                if i + 1 < end {
+                    let next_token = self.parse_tree[i + 1].clone();
+
+                    if next_token == "PARAGRAF" || next_token == "paragraf" {
+                        i = self.process_paragraph(i, end);
+                    }
+
+                    else if next_token == "LIST" || next_token == "list" {
+                        i = self.process_list(i, end);
+                    }
+
+                    else {
+                        self.resolved_parse_tree.push(token);
+                        i += 1;
+                    }
+                } else {
+                    self.resolved_parse_tree.push(token);
+                    i += 1;
+                }
+            }
+
+            else {
+                self.resolved_parse_tree.push(token);
+                i += 1;
+            }
+        }
+    }
+
+    fn push_scope(&mut self) {
+        self.active_scope_stack.push(HashMap::new());
+    }
+
+    fn pop_scope(&mut self) {
+        self.active_scope_stack.pop();
+    }
+
+    fn define_variable(&mut self, i: usize, end: usize) -> usize {
+        let mut name = String::new();
+        let mut value = String::new();
+
+        let mut j = i + 1;
+
+        while j < end
+            && self.parse_tree[j] != "#ITIZ"
+            && self.parse_tree[j] != "#itiz"
+        {
+            name.push_str(&self.parse_tree[j]);
+            j += 1;
+        }
+
+        j += 1;
+
+        while j < end
+            && self.parse_tree[j] != "#MKAY"
+            && self.parse_tree[j] != "#mkay"
+        {
+            value.push_str(&self.parse_tree[j]);
+            j += 1;
+        }
+
+        if let Some(scope) = self.active_scope_stack.last_mut() {
+            scope.insert(name, value);
+        }
+
+        if j < end {
+            j += 1;
+        }
+
+        j
+    }
+
+    fn resolve_variable(&mut self, i: usize, end: usize) -> usize {
+        let mut name = String::new();
+        let mut j = i + 2;
+
+        while j < end
+            && self.parse_tree[j] != "#OIC"
+            && self.parse_tree[j] != "#oic"
+        {
+            name.push_str(&self.parse_tree[j]);
+            j += 1;
+        }
+
+        if let Some(value) = self.find_variable(&name) {
+            for c in value.chars() {
+                self.resolved_parse_tree.push(c.to_string());
+            }
+        } else {
+            eprintln!("Semantic error: Variable '{}' has not been defined.", name);
+            std::process::exit(1);
+        }
+
+        if j < end {
+            j += 1;
+        }
+
+        j
+    }
+
+    fn find_variable(&self, name: &str) -> Option<String> {
+        for scope in self.active_scope_stack.iter().rev() {
+            if let Some(value) = scope.get(name) {
+                return Some(value.clone());
+            }
+        }
+
+        None
+    }
+
+    fn process_paragraph(&mut self, i: usize, end: usize) -> usize {
+        let block_end = self.find_block_end(i + 2, end);
+
+        self.resolved_parse_tree.push(self.parse_tree[i].clone());
+        self.resolved_parse_tree.push(self.parse_tree[i + 1].clone());
+
+        self.push_scope();
+
+        self.process_tokens(i + 2, block_end);
+
+        self.pop_scope();
+
+        if block_end < end {
+            self.resolved_parse_tree.push(self.parse_tree[block_end].clone());
+            return block_end + 1;
+        }
+
+        block_end
+    }
+
+    fn process_list(&mut self, i: usize, end: usize) -> usize {
+        let block_end = self.find_block_end(i + 2, end);
+
+        self.resolved_parse_tree.push(self.parse_tree[i].clone());
+        self.resolved_parse_tree.push(self.parse_tree[i + 1].clone());
+
+        self.push_scope();
+
+        let mut j = i + 2;
+
+        while j < block_end {
+            if (self.parse_tree[j] == "#GIMMEH"
+                || self.parse_tree[j] == "#gimmeh")
+                && j + 1 < block_end
+                && (self.parse_tree[j + 1] == "ITEM"
+                || self.parse_tree[j + 1] == "item")
+            {
+                j = self.process_list_item(j, block_end);
+            } else {
+                self.process_tokens(j, j + 1);
+                j += 1;
+            }
+        }
+
+        self.pop_scope();
+
+        if block_end < end {
+            self.resolved_parse_tree.push(self.parse_tree[block_end].clone());
+            return block_end + 1;
+        }
+
+        block_end
+    }
+
+    fn process_list_item(&mut self, i: usize, end: usize) -> usize {
+        let item_end = self.find_item_end(i + 2, end);
+
+        self.resolved_parse_tree.push(self.parse_tree[i].clone());
+        self.resolved_parse_tree.push(self.parse_tree[i + 1].clone());
+
+        self.push_scope();
+
+        self.process_tokens(i + 2, item_end);
+
+        self.pop_scope();
+
+        if item_end < end {
+            self.resolved_parse_tree.push(self.parse_tree[item_end].clone());
+            return item_end + 1;
+        }
+
+        item_end
+    }
+
+    fn find_block_end(&self, start: usize, end: usize) -> usize {
+        let mut depth = 1;
+        let mut i = start;
+
+        while i < end {
+            let token = &self.parse_tree[i];
+
+            if token == "#IHAZ" || token == "#ihaz" {
+                i += 1;
+
+                while i < end
+                    && self.parse_tree[i] != "#MKAY"
+                    && self.parse_tree[i] != "#mkay"
+                {
+                    i += 1;
+                }
+
+                i += 1;
+            }
+
+            else if token == "#MAEK" || token == "#maek" {
+                if i + 1 < end {
+                    let next_token = &self.parse_tree[i + 1];
+
+                    if next_token == "PARAGRAF"
+                        || next_token == "paragraf"
+                        || next_token == "LIST"
+                        || next_token == "list"
+                    {
+                        depth += 1;
+                    }
+                }
+
+                i += 1;
+            }
+
+            else if token == "#MKAY" || token == "#mkay" {
+                depth -= 1;
+
+                if depth == 0 {
+                    return i;
+                }
+
+                i += 1;
+            }
+
+            else {
+                i += 1;
+            }
+        }
+
+        end
+    }
+
+    fn find_item_end(&self, start: usize, end: usize) -> usize {
+        let mut i = start;
+
+        while i < end {
+            let token = &self.parse_tree[i];
+
+            if token == "#GIMMEH" || token == "#gimmeh" {
+                i += 1;
+
+                while i < end
+                    && self.parse_tree[i] != "#OIC"
+                    && self.parse_tree[i] != "#oic"
+                {
+                    i += 1;
+                }
+
+                i += 1;
+            }
+
+            else if token == "#OIC" || token == "#oic" {
+                return i;
+            }
+
+            else {
+                i += 1;
+            }
+        }
+
+        end
+    }
+}
+
+
+pub struct HtmlTranslator;
+
+impl HtmlTranslator {
+    pub fn translate(parse_tree: &[String]) -> String {
+        let mut html = String::new();
+        let mut closing_tags: Vec<&str> = Vec::new();
+        let mut i = 0;
+
+        while i < parse_tree.len() {
+            let token = &parse_tree[i];
+
+            match token.as_str() {
+                "#HAI" | "#hai" => {
+                    html.push_str("<html>\n");
+                }
+
+                "#KBYE" | "#kbye" => {
+                    html.push_str("</html>\n");
+                }
+
+                "#OBTW" | "#obtw" => {
+                    html.push_str("<!--");
+                }
+
+                "#TLDR" | "#tldr" => {
+                    html.push_str("-->");
+                }
+
+                "#MAEK" | "#maek" => {
+                    if i + 1 < parse_tree.len() {
+                        match parse_tree[i + 1].as_str() {
+                            "HEAD" | "head" => {
+                                html.push_str("<head>");
+                                closing_tags.push("</head>");
+                                i += 1;
+                            }
+
+                            "PARAGRAF" | "paragraf" => {
+                                html.push_str("<p>");
+                                closing_tags.push("</p>");
+                                i += 1;
+                            }
+
+                            "LIST" | "list" => {
+                                html.push_str("<ul>");
+                                closing_tags.push("</ul>");
+                                i += 1;
+                            }
+
+                            _ => html.push_str(token),
+                        }
+                    }
+                }
+
+                "#GIMMEH" | "#gimmeh" => {
+                    if i + 1 < parse_tree.len() {
+                        match parse_tree[i + 1].as_str() {
+                            "TITLE" | "title" => {
+                                html.push_str("<title>");
+                                closing_tags.push("</title>");
+                                i += 1;
+                            }
+
+                            "BOLD" | "bold" => {
+                                html.push_str("<b>");
+                                closing_tags.push("</b>");
+                                i += 1;
+                            }
+
+                            "ITEM" | "item" => {
+                                html.push_str("<li>");
+                                closing_tags.push("</li>");
+                                i += 1;
+                            }
+
+                            "LINX" | "linx" => {
+                                i += 2;
+
+                                let mut address = String::new();
+
+                                while i < parse_tree.len()
+                                    && parse_tree[i] != "#OIC"
+                                    && parse_tree[i] != "#oic"
+                                {
+                                    address.push_str(&parse_tree[i]);
+                                    i += 1;
+                                }
+
+                                html.push_str("<a href=\"");
+                                html.push_str(&address);
+                                html.push_str("\">");
+                                html.push_str(&address);
+                                html.push_str("</a>");
+                            }
+
+                            _ => html.push_str(token),
+                        }
+                    }
+                }
+
+                "#MKAY" | "#mkay" | "#OIC" | "#oic" => {
+                    if let Some(closing_tag) = closing_tags.pop() {
+                        html.push_str(closing_tag);
+                    }
+                }
+
+                "#NEWLINE" | "#newline" => {
+                    html.push_str("<br>");
+                }
+
+                _ => {
+                    html.push_str(token);
+                }
+            }
+
+            i += 1;
+        }
+
+        html
+    }
+}
+
 
 pub struct LolcodeCompiler {
     lexer: LolLexicalAnalyzer,
     current_tok: String,
+    pub html_output: String,
 }
 
 impl LolcodeCompiler {
@@ -787,6 +1230,7 @@ impl LolcodeCompiler {
         Self {
             lexer: LolLexicalAnalyzer::new(""),
             current_tok: String::new(),
+            html_output: String::new(),
         }
     }
 
@@ -820,9 +1264,6 @@ impl LolcodeCompiler {
     }
 
 
-
-
-
 }
 
 impl Compiler for LolcodeCompiler {
@@ -848,20 +1289,39 @@ impl Compiler for LolcodeCompiler {
     }
 
     fn parse(&mut self) {
-        {
+       let parse_tree = {
             let mut syntax_analyzer = LolcodeSyntaxAnalyzer::new(self);
             syntax_analyzer.parse_lolcode();
-        }
+            syntax_analyzer.parse_tree
+        };
+
         if !self.current_tok.is_empty() {
             eprintln!("Syntax error: Additional tokens found after the kbye annotation.");
             std::process::exit(1);
         }
+
+        let mut semantic_analyzer = LolcodeSemanticAnalyzer::new(parse_tree);
+        let resolved_parse_tree = semantic_analyzer.semantic_analysis();
+
+        self.html_output = HtmlTranslator::translate(&resolved_parse_tree);
     }
 
     fn current_token(&self) -> String { self.current_tok.clone() }
     fn set_current_token(&mut self, tok: String) { self.current_tok = tok; }
 }
 
+    fn open_in_browser(path: &str) -> Result<(), std::io::Error> {
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, 'start' is a cmd shell builtin, not a standalone executable,
+        // so we must invoke cmd.exe to run it.
+        Command::new("cmd")
+            .args(["/C", "start", "", path])
+            .status()?;
+    }
+
+    Ok(())
+}
 
 fn main() {
 // Usage in VS Code terminal:
@@ -898,5 +1358,17 @@ fn main() {
     compiler.compile(&sentence);
     compiler.parse();
 
-   // println!("The sentence '{}' follows the lolspeak grammar!", sentence.trim());
+
+    let output_path = Path::new(filename).with_extension("html");
+
+    fs::write(&output_path, &compiler.html_output).unwrap_or_else(|err| {
+        eprintln!("Error writing HTML file: {}", err);
+        std::process::exit(1);
+    });
+
+
+     if let Err(e) = open_in_browser(&output_path.to_string_lossy()) {
+        eprintln!("Failed to open browser: {}", e);
+    }
+
 }
