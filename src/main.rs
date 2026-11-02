@@ -1276,8 +1276,6 @@ impl Compiler for LolcodeCompiler {
         let candidate = self.lexer.get_next_token();
         if self.lexer.lookup(&candidate) {
             self.current_tok = candidate.clone();
-            // need to delete this before submitting the project
-            print!("{}", self.current_tok);
             candidate
         } else if candidate.is_empty() {
             self.current_tok.clear();
