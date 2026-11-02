@@ -573,37 +573,30 @@ impl<'a> SyntaxAnalyzer for LolcodeSyntaxAnalyzer<'a>{
     fn parse_inner_text(&mut self) {
         if self.is_obtw(&self.compiler.current_tok) { // comment
             self.parse_comment();
-            self.parse_body();
         } else if self.is_maek(&self.compiler.current_tok) { // list
             // adds token to parse tree
             self.add_to_parse_tree();
             self.compiler.next_syntax_token();
             if self.is_list(&self.compiler.current_tok) {
                 self.parse_list();
-                self.parse_body();
             } else {
                 eprintln!("Syntax error: '{}' was found when the list annotation (LIST, list) was expected.", self.compiler.current_tok);
                 std::process::exit(1);
             }
         } else if self.is_newline(&self.compiler.current_tok) { // newline
             self.parse_newline();
-            self.parse_body();
         } else if self.is_text(&self.compiler.current_tok) { // text
             self.parse_text();
-            self.parse_body();
         } else if self.is_gimmeh(&self.compiler.current_tok) { // bold, link, and variable use
             // adds token to parse tree
             self.add_to_parse_tree();
             self.compiler.next_syntax_token();
             if self.is_bold(&self.compiler.current_tok) {
                 self.parse_bold();
-                self.parse_body();
             } else if self.is_linx(&self.compiler.current_tok) {
                 self.parse_link();
-                self.parse_body();
             } else if self.is_var(&self.compiler.current_tok) {
                 self.parse_variable_use();
-                self.parse_body();
             } else {
                 eprintln!("Syntax error: '{}' was found when the bold, linx, or var annotations (BOLD, bold, LINK, linx, VAR, var) were expected.", self.compiler.current_tok);
                 std::process::exit(1);
