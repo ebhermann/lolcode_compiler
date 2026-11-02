@@ -205,19 +205,599 @@ impl LexicalAnalyzer for LolLexicalAnalyzer {
 // ===================== Syntax Analyzer =====================
 //
 
+/// OPTION 1 - Trait for a recursive descent Syntax Analyzer 
+/// over Vec<String>. Each function parses a nonterminal in 
+/// the grammar. On error: exit immediately.
+pub trait SyntaxAnalyzer {
+    fn parse_lolcode(&mut self);        
+    fn parse_head(&mut self);           
+    fn parse_title(&mut self);         
+    fn parse_comment(&mut self);        
+    fn parse_body(&mut self);           
+    fn parse_paragraph(&mut self);      
+    fn parse_inner_paragraph(&mut self);
+    fn parse_inner_text(&mut self);     
+    fn parse_variable_define(&mut self);
+    fn parse_variable_use(&mut self);   
+    fn parse_bold(&mut self);           
+    fn parse_list(&mut self);           
+    fn parse_list_items(&mut self);     
+    fn parse_inner_list(&mut self);     
+    fn parse_link(&mut self);          
+    fn parse_newline(&mut self);        
+    fn parse_text(&mut self);           
+}
 
-pub struct LolspeakCompiler {
+
+pub struct LolcodeSyntaxAnalyzer<'a> {
+    parse_tree: Vec<String>,
+    compiler: &'a mut LolcodeCompiler,
+}
+
+impl<'a> LolcodeSyntaxAnalyzer<'a> {
+    pub fn new(compiler: &'a mut LolcodeCompiler) -> Self {
+        Self {
+            parse_tree: Vec::new(),
+            compiler,
+        }
+    }
+
+    #[inline] fn is_hai(&self, s: &str) -> bool { self.compiler.lexer.hai.iter().any(|hai: &String| hai == s)}
+    #[inline] fn is_obtw(&self, s: &str) -> bool { self.compiler.lexer.obtw.iter().any(|obtw: &String| obtw == s)}
+    #[inline] fn is_tldr(&self, s: &str) -> bool { self.compiler.lexer.tldr.iter().any(|tldr: &String| tldr == s)}
+    #[inline] fn is_maek(&self, s: &str) -> bool { self.compiler.lexer.maek.iter().any(|maek: &String| maek == s)}
+    #[inline] fn is_head(&self, s: &str) -> bool { self.compiler.lexer.head.iter().any(|head: &String| head == s)}
+    #[inline] fn is_mkay(&self, s: &str) -> bool { self.compiler.lexer.mkay.iter().any(|mkay: &String| mkay == s)}
+    #[inline] fn is_gimmeh(&self, s: &str) -> bool { self.compiler.lexer.gimmeh.iter().any(|gimmeh: &String| gimmeh == s)}
+    #[inline] fn is_oic(&self, s: &str) -> bool { self.compiler.lexer.oic.iter().any(|oic: &String| oic == s)}
+    #[inline] fn is_title(&self, s: &str) -> bool { self.compiler.lexer.title.iter().any(|title: &String| title == s)}
+    #[inline] fn is_ihaz(&self, s: &str) -> bool { self.compiler.lexer.ihaz.iter().any(|ihaz: &String| ihaz == s)}
+    #[inline] fn is_varname(&self, s: &str) -> bool { self.compiler.lexer.varname.iter().any(|vname: &String| vname == s)}
+    #[inline] fn is_itiz(&self, s: &str) -> bool { self.compiler.lexer.itiz.iter().any(|itiz: &String| itiz == s)}
+    #[inline] fn is_newline(&self, s: &str) -> bool { self.compiler.lexer.newline.iter().any(|newline: &String| newline == s)}
+    #[inline] fn is_paragraf(&self, s: &str) -> bool { self.compiler.lexer.paragraf.iter().any(|para: &String| para == s)}
+    #[inline] fn is_linx(&self, s: &str) -> bool { self.compiler.lexer.linx.iter().any(|link: &String| link == s)}
+    #[inline] fn is_var(&self, s: &str) -> bool { self.compiler.lexer.var.iter().any(|var: &String| var == s)}
+    #[inline] fn is_list(&self, s: &str) -> bool { self.compiler.lexer.list.iter().any(|list: &String| list == s)}
+    #[inline] fn is_item(&self, s: &str) -> bool { self.compiler.lexer.item.iter().any(|item: &String| item == s)}
+    #[inline] fn is_bold(&self, s: &str) -> bool { self.compiler.lexer.bold.iter().any(|bold: &String| bold == s)}
+    #[inline] fn is_address(&self, s: &str) -> bool { self.compiler.lexer.address.iter().any(|address: &String| address == s)}
+    #[inline] fn is_text(&self, s: &str) -> bool { self.compiler.lexer.text.iter().any(|txt: &String| txt == s)}
+    #[inline] fn is_kbye(&self, s: &str) -> bool { self.compiler.lexer.kbye.iter().any(|kbye: &String| kbye == s)}
+  
+    fn add_to_parse_tree(&mut self) {
+        self.parse_tree.push(self.compiler.current_tok.clone());
+    }
+
+
+    fn hai(&mut self) {
+        if self.is_hai(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the hai annotation (#HAI, #hai) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+    fn comment_list(&mut self) {
+        if self.is_obtw(&self.compiler.current_tok) {
+            // adds to parse tree
+            self.add_to_parse_tree();
+            self.add_to_parse_tree();
+            self.compiler.next_token();
+            self.comment();
+            self.comment_list();
+        }
+    }
+
+    fn comment(&mut self) {
+        if self.is_text(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.parse_text();
+
+            if self.is_tldr(&self.compiler.current_tok) {
+                // adds to parse tree
+                self.add_to_parse_tree();
+                self.compiler.next_syntax_token();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the tldr annotation (#TLDR, #tldr) was expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when text was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }
+
+
+    fn list_item(&mut self) {
+        if self.is_gimmeh(&self.compiler.current_tok) {
+            // adds to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+            if self.is_item(&self.compiler.current_tok) {
+                self.parse_variable_define();
+                self.parse_inner_list();
+                if self.is_oic(&self.compiler.current_tok) {
+                    // adds to parse tree
+                    self.add_to_parse_tree();
+                    self.compiler.next_syntax_token();
+                } else {
+                    eprintln!("Syntax error: '{}' was found when the oic annotation (#OIC, #oic) was expected.", self.compiler.current_tok);
+                    std::process::exit(1);
+                }
+            }
+        }
+    }
+
+    fn list_content(&mut self) {
+        if self.is_obtw(&self.compiler.current_tok) { // comment
+            self.parse_comment();
+            self.parse_body();
+        } else if self.is_newline(&self.compiler.current_tok) { // newline
+            self.parse_newline();
+            self.parse_body();
+        } else if self.is_text(&self.compiler.current_tok) { // text
+            self.parse_text();
+            self.parse_body();
+        } else if self.is_gimmeh(&self.compiler.current_tok) { // bold, link, and variable use
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+            if self.is_bold(&self.compiler.current_tok) {
+                self.parse_bold();
+                self.parse_body();
+            } else if self.is_linx(&self.compiler.current_tok) {
+                self.parse_link();
+                self.parse_body();
+            } else if self.is_var(&self.compiler.current_tok) {
+                self.parse_variable_use();
+                self.parse_body();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the bold, linx, or var annotations (BOLD, bold, LINK, linx, VAR, var) were expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when the var, comment, bold, link, newline, or text annotations (VAR, var, #OBTW, #obtw, BOLD, bold #MAEK, #maek, LINX, linx, #NEWLINE, #newline) were expected.", self.compiler.current_tok);
+                std::process::exit(1);
+        }
+    }
+
+
+     // implemented now to test lexer rules for text. As of now, things seem to be working
+    fn text_list(&mut self) {
+        if self.is_text(&self.compiler.current_tok) {
+            self.text();
+            self.text_list();
+        }
+    }
+
+    fn text(&mut self) {
+        // adds token to parse tree
+        self.add_to_parse_tree();
+        self.compiler.next_token();
+    }
+
+    fn varname_list(&mut self) {
+        if self.is_varname(&self.compiler.current_tok) {
+            self.varname();
+            self.varname_list();
+        }
+    }
+
+    fn varname(&mut self) {
+        // adds token to parse tree
+        self.add_to_parse_tree();
+        self.compiler.next_token();
+    }
+
+     fn address_list(&mut self) {
+        if self.is_address(&self.compiler.current_tok) {
+            self.address();
+            self.address_list();
+        }
+    }
+
+    fn address(&mut self) {
+        // adds token to parse tree
+        self.add_to_parse_tree();
+        self.compiler.next_token();
+    }
+
+    fn kbye(&mut self) {
+        if self.is_kbye(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the kbye annotation (#KBYE, #kbye) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }
+}
+
+impl<'a> SyntaxAnalyzer for LolcodeSyntaxAnalyzer<'a>{
+    fn parse_lolcode(&mut self) {
+        self.hai();
+        self.parse_comment();
+        self.parse_head();
+        self.parse_variable_define();
+        self.parse_body();
+        self.kbye();
+    }
+    fn parse_head(&mut self) {
+        if self.is_maek(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+
+            if self.is_head(&self.compiler.current_tok) {
+                // adds token to parse tree
+                self.add_to_parse_tree();
+                self.compiler.next_syntax_token();
+                self.parse_title();
+
+                if self.is_mkay(&self.compiler.current_tok) {
+                    // adds token to parse tree
+                    self.add_to_parse_tree();
+                    self.compiler.next_syntax_token();
+                } else {
+                    eprintln!("Syntax error: '{}' was found when the mkay annotation (#MKAY, #mkay) was expected.", self.compiler.current_tok);
+                    std::process::exit(1);
+                }
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when the maek annotation (#MAEK, #maek) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }        
+
+    fn parse_title(&mut self) {
+        if self.is_gimmeh(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+            if self.is_title(&self.compiler.current_tok) {
+                // adds token to parse tree
+                self.add_to_parse_tree();
+                self.compiler.next_token();
+                if self.is_text(&self.compiler.current_tok) {
+                    self.parse_text();
+                } else {
+                    eprintln!("Syntax error: '{}' was found when text was expected.", self.compiler.current_tok);
+                    std::process::exit(1);
+                }
+                if self.is_oic(&self.compiler.current_tok) {
+                    // adds token to parse tree
+                    self.add_to_parse_tree();
+                    self.compiler.next_syntax_token();
+
+                } else {
+                    eprintln!("Syntax error: '{}' was found when the oic annotation (#OIC, #oic) was expected.", self.compiler.current_tok);
+                    std::process::exit(1);
+                }
+            } else {
+                eprintln!("Syntax error: '{}' was found when the title annotation (#MAEK, #maek) was expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when the gimmeh annotation (#GIMMEH, #gimmeh) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }  
+
+
+    fn parse_comment(&mut self) {
+        self.comment_list();
+    }     
+
+
+    fn parse_body(&mut self) { 
+        if self.is_obtw(&self.compiler.current_tok) { // comment
+            self.parse_comment();
+            self.parse_body();
+        } else if self.is_maek(&self.compiler.current_tok) { // list and paragraf
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+            if self.is_list(&self.compiler.current_tok) {
+                self.parse_list();
+                self.parse_body();
+            } else if self.is_paragraf(&self.compiler.current_tok) {
+                self.parse_paragraph();
+                self.parse_body();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the paragraf or list annotations (PARAGRAF, paragraf, LIST, list) were expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else if self.is_newline(&self.compiler.current_tok) { // newline
+            self.parse_newline();
+            self.parse_body();
+        } else if self.is_text(&self.compiler.current_tok) { // text
+            self.parse_text();
+            self.parse_body();
+        } else if self.is_gimmeh(&self.compiler.current_tok) { // bold, link, and variable use
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+            if self.is_bold(&self.compiler.current_tok) {
+                self.parse_bold();
+                self.parse_body();
+            } else if self.is_linx(&self.compiler.current_tok) {
+                self.parse_link();
+                self.parse_body();
+            } else if self.is_var(&self.compiler.current_tok) {
+                self.parse_variable_use();
+                self.parse_body();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the bold, linx, or var annotations (BOLD, bold, LINK, linx, VAR, var) were expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        }
+    }     
+
+
+    fn parse_paragraph(&mut self) {
+        // Only reach this function if the current token is paragraf
+        self.add_to_parse_tree();
+        self.compiler.next_syntax_token();
+        self.parse_variable_define();
+        self.parse_inner_paragraph();
+        if self.is_mkay(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the mkay annotation (#MKAY, #mkay) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }   
+
+
+    fn parse_inner_paragraph(&mut self) {
+        if !self.is_mkay(&self.compiler.current_tok) {
+            self.parse_inner_text();
+            self.parse_inner_paragraph();
+        }
+    }
+
+
+    fn parse_inner_text(&mut self) {
+        if self.is_obtw(&self.compiler.current_tok) { // comment
+            self.parse_comment();
+            self.parse_body();
+        } else if self.is_maek(&self.compiler.current_tok) { // list
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+            if self.is_list(&self.compiler.current_tok) {
+                self.parse_list();
+                self.parse_body();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the list annotation (LIST, list) was expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else if self.is_newline(&self.compiler.current_tok) { // newline
+            self.parse_newline();
+            self.parse_body();
+        } else if self.is_text(&self.compiler.current_tok) { // text
+            self.parse_text();
+            self.parse_body();
+        } else if self.is_gimmeh(&self.compiler.current_tok) { // bold, link, and variable use
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+            if self.is_bold(&self.compiler.current_tok) {
+                self.parse_bold();
+                self.parse_body();
+            } else if self.is_linx(&self.compiler.current_tok) {
+                self.parse_link();
+                self.parse_body();
+            } else if self.is_var(&self.compiler.current_tok) {
+                self.parse_variable_use();
+                self.parse_body();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the bold, linx, or var annotations (BOLD, bold, LINK, linx, VAR, var) were expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when the var, comment, bold, list, link, newline, or text annotations (VAR, var, #OBTW, #obtw, BOLD, bold #MAEK, #maek, LIST, list, LINX, linx, #NEWLINE, #newline) were expected.", self.compiler.current_tok);
+                std::process::exit(1);
+        }
+    }   
+
+
+    fn parse_variable_define(&mut self) {
+        if self.is_ihaz(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+            if self.is_varname(&self.compiler.current_tok) {
+                self.varname_list();
+                self.compiler.next_syntax_token();
+                if self.is_itiz(&self.compiler.current_tok) {
+                    // adds token to parse tree
+                    self.add_to_parse_tree();
+                    self.compiler.next_token();
+                    if self.is_text(&self.compiler.current_tok) {
+                        self.parse_text(); // Since VARVALUE is just valid text characters
+                        if self.is_mkay(&self.compiler.current_tok) {
+                            // adds token to parse tree
+                            self.add_to_parse_tree();
+                            self.compiler.next_token();
+                        } else {
+                            eprintln!("Syntax error: '{}' was found when the mkay annotation (#MKAY, #mkay) was expected.", self.compiler.current_tok);
+                            std::process::exit(1);
+                        }
+                    } else {
+                        eprintln!("Syntax error: '{}' was found when a variable value was expected.", self.compiler.current_tok);
+                        std::process::exit(1);
+                    }
+
+                } else {
+                    eprintln!("Syntax error: '{}' was found when the itiz annotation (#ITIZ, #itiz) was expected.", self.compiler.current_tok);
+                    std::process::exit(1);
+                }
+            } else {
+                eprintln!("Syntax error: '{}' was found when text was expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        }
+    }
+
+
+    // start with var, not gimmeh
+    fn parse_variable_use(&mut self) {
+        // gimmeh has already been added to the parse tree and var is the current token
+        self.add_to_parse_tree();
+        self.compiler.next_syntax_token();
+
+        if self.is_varname(&self.compiler.current_tok) {
+            self.varname_list();
+            self.compiler.next_syntax_token();
+            if self.is_oic(&self.compiler.current_tok) {
+                // adds token to parse tree
+                self.add_to_parse_tree();
+                self.compiler.next_syntax_token();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the oic annotation (#OIC, #oic) was expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when a variable name was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    } 
+
+
+    // start with bold not gimmeh
+    fn parse_bold(&mut self) {
+        // GIMMEH annotation has already been added to the parse tree at this point
+        // current token is already bold or BOLD
+        self.add_to_parse_tree();
+        self.compiler.next_token();
+        if self.is_text(&self.compiler.current_tok) {
+            self.parse_text();
+            // text has moved current token ahead
+            if self.is_oic(&self.compiler.current_tok) {
+                // adds token to parse tree
+                self.add_to_parse_tree();
+                self.compiler.next_syntax_token();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the oic annotation (#OIC, #oic) was expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when text was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }   
+
+
+    fn parse_list(&mut self) {
+        // maek has already been added to the parse tree
+        // current token is list
+        self.add_to_parse_tree();
+        self.compiler.next_syntax_token();
+        self.list_item();
+        self.parse_list_items();
+        if self.is_mkay(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the mkay annotation (#MKAY, #mkay) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }    
+
+
+    fn parse_list_items(&mut self) {
+        if self.is_gimmeh(&self.compiler.current_tok) {
+            self.list_item();
+            self.parse_list_items();
+        }
+    }     
+
+
+    fn parse_inner_list(&mut self) {
+        if self.is_obtw(&self.compiler.current_tok) || self.is_newline(&self.compiler.current_tok) || self.is_text(&self.compiler.current_tok) 
+        || self.is_gimmeh(&self.compiler.current_tok) {
+            self.list_content();
+            self.parse_inner_list();
+        }
+    }    
+
+    // start with linx, not gimmeh
+    fn parse_link(&mut self) {
+        // gimmeh has already been added to the parse tree at this point
+        // // already have linx as the current token
+        self.add_to_parse_tree();
+        self.compiler.next_syntax_token();
+        if self.is_address(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.address_list();
+            self.compiler.next_syntax_token();
+
+            if self.is_oic(&self.compiler.current_tok) {
+                // adds token to parse tree
+                self.add_to_parse_tree();
+                self.compiler.next_syntax_token();
+            } else {
+                eprintln!("Syntax error: '{}' was found when the oic annotation (#OIC, #oic) was expected.", self.compiler.current_tok);
+                std::process::exit(1);
+            }
+        } else {
+            eprintln!("Syntax error: '{}' was found when a link address was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }  
+
+
+    fn parse_newline(&mut self) {
+        if self.is_newline(&self.compiler.current_tok) {
+            // adds token to parse tree
+            self.add_to_parse_tree();
+            self.compiler.next_syntax_token();
+        } else {
+            eprintln!("Syntax error: '{}' was found when the newline annotation (#NEWLINE, #newline) was expected.", self.compiler.current_tok);
+            std::process::exit(1);
+        }
+    }   
+
+
+    fn parse_text(&mut self) {
+        self.text_list();
+    }
+
+    
+}
+
+
+pub struct LolcodeCompiler {
     lexer: LolLexicalAnalyzer,
     current_tok: String,
 }
 
-impl LolspeakCompiler {
+impl LolcodeCompiler {
     pub fn new() -> Self {
         Self {
             lexer: LolLexicalAnalyzer::new(""),
             current_tok: String::new(),
         }
     }
+
+    fn next_syntax_token(&mut self) {
+        let mut candidate = self.next_token();
+
+        while !candidate.is_empty() && candidate.chars().all(|c| c.is_whitespace()) {
+            candidate = self.next_token();
+        }
+    }
+
 
     fn start(&mut self) {
         let candidate = self.lexer.get_next_token();
@@ -233,94 +813,12 @@ impl LolspeakCompiler {
     }
 
 
-    #[inline] fn is_text(&self, s: &str) -> bool { self.lexer.text.iter().any(|txt: &String| txt == s)}
-    #[inline] fn is_hai(&self, s: &str) -> bool { self.lexer.hai.iter().any(|hai: &String| hai == s)}
-    #[inline] fn is_maek(&self, s: &str) -> bool { self.lexer.maek.iter().any(|maek: &String| maek == s)}
-    #[inline] fn is_paragraf(&self, s: &str) -> bool { self.lexer.paragraf.iter().any(|para: &String| para == s)}
-    #[inline] fn is_gimmeh(&self, s: &str) -> bool { self.lexer.gimmeh.iter().any(|gimmeh: &String| gimmeh == s)}
-    #[inline] fn is_bold(&self, s: &str) -> bool { self.lexer.bold.iter().any(|bold: &String| bold == s)}
-  
 
-    fn lolspeak(&mut self) {
-        self.hai();
-        self.maek();
-        self.paragraf();
-        self.gimmeh();
-        self.bold();
-        self.text_list();
-        self.gimmeh();
-        self.bold();
-    }
-
-    // implemented now to test lexer rules for text. As of now, things seem to be working
-    fn text_list(&mut self) {
-        if self.is_text(&self.current_tok) {
-            self.text();
-            self.text_list();
-        }
-    }
-
-    fn text(&mut self) {
-        if self.is_text(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        }
-    }
-
-    fn hai(&mut self) {
-        if self.is_hai(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the hai annotation (#HAI, #hai) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
-
-    fn maek(&mut self) {
-        if self.is_maek(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the maek annotation (#MAEK, #maek) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
-
-    fn paragraf(&mut self) {
-        if self.is_paragraf(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the paragraf annotation (PARAGRAF, paragraf) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
-
-    fn gimmeh(&mut self) {
-        if self.is_gimmeh(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the gimmeh annotation (#GIMMEH, #gimmeh) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
-
-    fn bold(&mut self) {
-        if self.is_bold(&self.current_tok) {
-            // add token to parse tree: to be done
-            self.next_token();
-        } else {
-            eprintln!("Syntax error: '{}' was found when the bold annotation (BOLD, bold) was expected.", self.current_tok);
-            std::process::exit(1);
-        }
-    }
 
 
 }
 
-impl Compiler for LolspeakCompiler {
+impl Compiler for LolcodeCompiler {
     fn compile(&mut self, source: &str) {
         self.lexer = LolLexicalAnalyzer::new(source);
         self.start();
@@ -330,6 +828,7 @@ impl Compiler for LolspeakCompiler {
         let candidate = self.lexer.get_next_token();
         if self.lexer.lookup(&candidate) {
             self.current_tok = candidate.clone();
+            // need to delete this before submitting the project
             print!("{}", self.current_tok);
             candidate
         } else if candidate.is_empty() {
@@ -342,7 +841,10 @@ impl Compiler for LolspeakCompiler {
     }
 
     fn parse(&mut self) {
-        self.lolspeak();
+        {
+            let mut syntax_analyzer = LolcodeSyntaxAnalyzer::new(self);
+            syntax_analyzer.parse_lolcode();
+        }
         if !self.current_tok.is_empty() {
             eprintln!("Syntax error: Additional tokens found after the sentence.");
             std::process::exit(1);
@@ -372,7 +874,7 @@ fn main() {
         std::process::exit(1);
     });
 
-    let mut compiler = LolspeakCompiler::new();
+    let mut compiler = LolcodeCompiler::new();
     compiler.compile(&sentence);
     compiler.parse();
 
