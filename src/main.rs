@@ -1311,6 +1311,22 @@ impl Compiler for LolcodeCompiler {
             .status()?;
     }
 
+    #[cfg(target_os = "macos")]
+    {
+        // macOS natively utilizes 'open' 
+        Command::new("open")
+            .arg(path)
+            .status()
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "openbsd"))]
+    {
+        // Linux/Unix desktops utilize the freedesktop 'xdg-open' command
+        Command::new("xdg-open")
+            .arg(path)
+            .status()
+    }
+
     Ok(())
 }
 
