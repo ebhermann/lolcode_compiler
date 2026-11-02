@@ -538,6 +538,9 @@ impl<'a> SyntaxAnalyzer for LolcodeSyntaxAnalyzer<'a>{
                 eprintln!("Syntax error: '{}' was found when the bold, linx, or var annotations (BOLD, bold, LINK, linx, VAR, var) were expected.", self.compiler.current_tok);
                 std::process::exit(1);
             }
+        } else if !self.is_kbye(&self.compiler.current_tok) {
+            eprintln!("Syntax error: '{}' was found when a valid body element or the kbye annotation was expected.", self.compiler.current_tok);
+            std::process::exit(1);
         }
     }     
 
