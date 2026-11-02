@@ -287,7 +287,6 @@ impl<'a> LolcodeSyntaxAnalyzer<'a> {
         if self.is_obtw(&self.compiler.current_tok) {
             // adds to parse tree
             self.add_to_parse_tree();
-            self.add_to_parse_tree();
             self.compiler.next_token();
             self.comment();
             self.comment_list();
@@ -296,8 +295,6 @@ impl<'a> LolcodeSyntaxAnalyzer<'a> {
 
     fn comment(&mut self) {
         if self.is_text(&self.compiler.current_tok) {
-            // adds token to parse tree
-            self.add_to_parse_tree();
             self.parse_text();
 
             if self.is_tldr(&self.compiler.current_tok) {
