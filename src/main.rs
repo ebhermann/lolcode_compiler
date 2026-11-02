@@ -1,5 +1,7 @@
 use std::env;
 use std::fs;
+use std::path::Path;
+use std::process::Command;
 
 //
 // ===================== Compiler Trait =====================
@@ -793,10 +795,12 @@ impl LolcodeSemanticAnalyzer {
         }
     }
 
-    fn semantic_analysis(&mut self) {
+    fn semantic_analysis(&mut self) -> Vec<String> {
         self.push_scope();
         self.process_tokens(0, self.parse_tree.len());
         self.pop_scope();
+
+        self.resolved_parse_tree.clone()
     }
 
     fn process_tokens(&mut self, start: usize, end: usize) {
@@ -1091,9 +1095,134 @@ impl LolcodeSemanticAnalyzer {
     }
 }
 
+
+pub struct HtmlTranslator;
+
+impl HtmlTranslator {
+    pub fn translate(parse_tree: &[String]) -> String {
+        let mut html = String::new();
+        let mut closing_tags: Vec<&str> = Vec::new();
+        let mut i = 0;
+
+        while i < parse_tree.len() {
+            let token = &parse_tree[i];
+
+            match token.as_str() {
+                "#HAI" | "#hai" => {
+                    html.push_str("<html>\n");
+                }
+
+                "#KBYE" | "#kbye" => {
+                    html.push_str("</html>\n");
+                }
+
+                "#OBTW" | "#obtw" => {
+                    html.push_str("<!--");
+                }
+
+                "#TLDR" | "#tldr" => {
+                    html.push_str("-->");
+                }
+
+                "#MAEK" | "#maek" => {
+                    if i + 1 < parse_tree.len() {
+                        match parse_tree[i + 1].as_str() {
+                            "HEAD" | "head" => {
+                                html.push_str("<head>");
+                                closing_tags.push("</head>");
+                                i += 1;
+                            }
+
+                            "PARAGRAF" | "paragraf" => {
+                                html.push_str("<p>");
+                                closing_tags.push("</p>");
+                                i += 1;
+                            }
+
+                            "LIST" | "list" => {
+                                html.push_str("<ul>");
+                                closing_tags.push("</ul>");
+                                i += 1;
+                            }
+
+                            _ => html.push_str(token),
+                        }
+                    }
+                }
+
+                "#GIMMEH" | "#gimmeh" => {
+                    if i + 1 < parse_tree.len() {
+                        match parse_tree[i + 1].as_str() {
+                            "TITLE" | "title" => {
+                                html.push_str("<title>");
+                                closing_tags.push("</title>");
+                                i += 1;
+                            }
+
+                            "BOLD" | "bold" => {
+                                html.push_str("<b>");
+                                closing_tags.push("</b>");
+                                i += 1;
+                            }
+
+                            "ITEM" | "item" => {
+                                html.push_str("<li>");
+                                closing_tags.push("</li>");
+                                i += 1;
+                            }
+
+                            "LINX" | "linx" => {
+                                i += 2;
+
+                                let mut address = String::new();
+
+                                while i < parse_tree.len()
+                                    && parse_tree[i] != "#OIC"
+                                    && parse_tree[i] != "#oic"
+                                {
+                                    address.push_str(&parse_tree[i]);
+                                    i += 1;
+                                }
+
+                                html.push_str("<a href=\"");
+                                html.push_str(&address);
+                                html.push_str("\">");
+                                html.push_str(&address);
+                                html.push_str("</a>");
+                            }
+
+                            _ => html.push_str(token),
+                        }
+                    }
+                }
+
+                "#MKAY" | "#mkay" | "#OIC" | "#oic" => {
+                    if let Some(closing_tag) = closing_tags.pop() {
+                        html.push_str(closing_tag);
+                    }
+                }
+
+                "#NEWLINE" | "#newline" => {
+                    html.push_str("<br>");
+                }
+
+                _ => {
+                    html.push_str(token);
+                }
+            }
+
+            i += 1;
+        }
+
+        html
+    }
+}
+
+
 pub struct LolcodeCompiler {
     lexer: LolLexicalAnalyzer,
     current_tok: String,
+    pub html_output: String,
 }
 
 impl LolcodeCompiler {
@@ -1101,6 +1230,7 @@ impl LolcodeCompiler {
         Self {
             lexer: LolLexicalAnalyzer::new(""),
             current_tok: String::new(),
+            html_output: String::new(),
         }
     }
 
@@ -1164,19 +1294,34 @@ impl Compiler for LolcodeCompiler {
             syntax_analyzer.parse_lolcode();
             syntax_analyzer.parse_tree
         };
+
         if !self.current_tok.is_empty() {
             eprintln!("Syntax error: Additional tokens found after the kbye annotation.");
             std::process::exit(1);
         }
 
         let mut semantic_analyzer = LolcodeSemanticAnalyzer::new(parse_tree);
-        semantic_analyzer.semantic_analysis();
+        let resolved_parse_tree = semantic_analyzer.semantic_analysis();
+
+        self.html_output = HtmlTranslator::translate(&resolved_parse_tree);
     }
 
     fn current_token(&self) -> String { self.current_tok.clone() }
     fn set_current_token(&mut self, tok: String) { self.current_tok = tok; }
 }
 
+    fn open_in_browser(path: &str) -> Result<(), std::io::Error> {
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, 'start' is a cmd shell builtin, not a standalone executable,
+        // so we must invoke cmd.exe to run it.
+        Command::new("cmd")
+            .args(["/C", "start", "", path])
+            .status()?;
+    }
+
+    Ok(())
+}
 
 fn main() {
 // Usage in VS Code terminal:
@@ -1213,5 +1358,17 @@ fn main() {
     compiler.compile(&sentence);
     compiler.parse();
 
-   // println!("The sentence '{}' follows the lolspeak grammar!", sentence.trim());
+
+    let output_path = Path::new(filename).with_extension("html");
+
+    fs::write(&output_path, &compiler.html_output).unwrap_or_else(|err| {
+        eprintln!("Error writing HTML file: {}", err);
+        std::process::exit(1);
+    });
+
+
+     if let Err(e) = open_in_browser(&output_path.to_string_lossy()) {
+        eprintln!("Failed to open browser: {}", e);
+    }
+
 }
